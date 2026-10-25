@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Loop — A Graphic Novel</title>
+<meta name="description" content="The Loop, a graphic novel. Read online.">
+<meta property="og:title" content="The Loop — A Graphic Novel">
+<meta property="og:description" content="Read The Loop online.">
+<meta property="og:image" content="cover.webp">
+<style>
+  :root { --bg:#0b0b0b; --fg:#ece8e0; --dim:#8a8780; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { height:100%; background:var(--bg); color:var(--fg);
+    font-family:"Helvetica Neue", Arial, sans-serif; }
+  .hidden { display:none !important; }
+
+  /* Landing */
+  #landing { min-height:100%; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; gap:28px; padding:32px 16px; }
+  #landing img { max-height:72vh; max-width:92vw; width:auto; height:auto;
+    box-shadow:0 0 60px rgba(255,255,255,.08); }
+  .actions { display:flex; gap:16px; align-items:center; flex-wrap:wrap; justify-content:center; }
+  button, .link { font:inherit; letter-spacing:.2em; text-transform:uppercase; cursor:pointer;
+    background:none; color:var(--fg); border:1px solid var(--fg); padding:14px 34px;
+    text-decoration:none; font-size:14px; }
+  button:hover, .link:hover, button:focus-visible { background:var(--fg); color:var(--bg); outline:none; }
+  .link { border-color:var(--dim); color:var(--dim); }
+
+  /* Reader */
+  #reader { height:100%; display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:10px 16px; border-bottom:1px solid #222; font-size:13px; color:var(--dim); }
+  header button { padding:6px 14px; font-size:12px; }
+  header .group { display:flex; align-items:center; gap:10px; }
+  #stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center;
+    position:relative; overflow:auto; }
+  #stage img { max-height:100%; max-width:100%; object-fit:contain; display:block; user-select:none; }
+  .nav { position:absolute; top:0; bottom:0; width:18%; background:none; border:0; padding:0;
+    color:transparent; }
+  .nav:hover { background:linear-gradient(to var(--d), rgba(255,255,255,.06), transparent); color:var(--fg); }
+  #prev { left:0; --d:right; } #next { right:0; --d:left; }
+  .nav[disabled] { display:none; }
+  #stage.zoom { align-items:flex-start; justify-content:flex-start; }
+  #stage.zoom img { max-height:none; max-width:none; width:100%; }
+  @media (max-width:700px) { .nav { width:25%; } }
+</style>
+</head>
+<body>
+
+<section id="landing">
+  <img src="cover.webp" alt="The Loop — cover: an officer at a control desk faces a giant smiley face on a screen">
+  <div class="actions">
+    <button id="enter" autofocus>Enter</button>
+  </div>
+</section>
+
+<section id="reader" class="hidden" aria-label="Reader">
+  <header>
+    <div class="group"><button id="home">Cover</button></div>
+    <div class="group">
+      <button id="back" aria-label="Previous page">&larr;</button>
+      <span id="count"></span>
+      <button id="fwd" aria-label="Next page">&rarr;</button>
+    </div>
+    <div class="group"><button id="zoom">Zoom</button></div>
+  </header>
+  <main id="stage">
+    <button class="nav" id="prev" aria-label="Previous page">&lsaquo;</button>
+    <img id="page" alt="">
+    <button class="nav" id="next" aria-label="Next page">&rsaquo;</button>
+  </main>
+</section>
+
+<script>
+(function () {
+  var TOTAL = 49;
+  var $ = function (id) { return document.getElementById(id); };
+  var page = 1;
+
+  function src(n) { return "pages/" + (n < 10 ? "0" + n : n) + ".webp"; }
+
+  function show(n, push) {
+    page = Math.max(1, Math.min(TOTAL, n));
+    $("landing").classList.add("hidden");
+    $("reader").classList.remove("hidden");
+    $("page").src = src(page);
+    $("page").alt = "Page " + page + " of " + TOTAL;
+    $("count").textContent = page + " / " + TOTAL;
+    $("prev").disabled = $("back").disabled = page === 1;
+    $("next").disabled = $("fwd").disabled = page === TOTAL;
+    $("stage").scrollTo(0, 0);
+    if (page < TOTAL) new Image().src = src(page + 1);
+    if (push !== false) history.replaceState(null, "", "#" + page);
+  }
+
+  function cover() {
+    $("reader").classList.add("hidden");
+    $("landing").classList.remove("hidden");
+    history.replaceState(null, "", location.pathname);
+  }
+
+  $("enter").onclick = function () { show(2); };
+  $("home").onclick = cover;
+  $("prev").onclick = $("back").onclick = function () { page === 2 ? cover() : show(page - 1); };
+  $("next").onclick = $("fwd").onclick = function () { show(page + 1); };
+  $("zoom").onclick = function () { $("stage").classList.toggle("zoom"); };
+
+  document.addEventListener("keydown", function (e) {
+    if ($("reader").classList.contains("hidden")) {
+      if (e.key === "Enter" || e.key === "ArrowRight") show(2);
+      return;
+    }
+    if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(page + 1); }
+    else if (e.key === "ArrowLeft") { page === 2 ? cover() : show(page - 1); }
+    else if (e.key === "Escape") cover();
+  });
+
+  var touchX = null;
+  $("stage").addEventListener("touchstart", function (e) { touchX = e.touches[0].clientX; }, { passive: true });
+  $("stage").addEventListener("touchend", function (e) {
+    if (touchX === null || $("stage").classList.contains("zoom")) return;
+    var dx = e.changedTouches[0].clientX - touchX; touchX = null;
+    if (Math.abs(dx) > 50) dx < 0 ? show(page + 1) : (page === 2 ? cover() : show(page - 1));
+  }, { passive: true });
+
+  var h = parseInt(location.hash.slice(1), 10);
+  if (h >= 2 && h <= TOTAL) show(h, false);
+})();
+</script>
+</body>
+</html>
