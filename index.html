@@ -8,6 +8,8 @@
 <meta property="og:title" content="The Loop — A Graphic Novel">
 <meta property="og:description" content="Read The Loop online.">
 <meta property="og:image" content="cover.webp">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@1,400;1,600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root { --bg:#0b0b0b; --fg:#ece8e0; --dim:#8a8780; }
   * { box-sizing:border-box; margin:0; }
@@ -37,25 +39,37 @@
 
   /* Intro */
   #intro { position:fixed; inset:0; z-index:10; background:#000; display:flex; align-items:center;
-    justify-content:center; padding:8vw; cursor:pointer; transition:opacity 1.6s ease; }
+    justify-content:center; padding:6vw; cursor:pointer; transition:opacity 1.8s ease; overflow:hidden; }
   #intro.out { opacity:0; pointer-events:none; }
-  #intro p { max-width:34em; font-style:italic; color:#fff; font-size:clamp(17px,2.4vw,26px);
-    line-height:1.7; text-align:center; opacity:0; transition:opacity 2s ease; position:relative; }
-  #intro p.in { opacity:1; }
-  #intro p.glitch { animation:glitch .28s steps(2,end); }
-  #intro p::before, #intro p::after { content:attr(data-t); position:absolute; inset:0; opacity:0; }
-  #intro p.glitch::before { opacity:.7; color:#f33; transform:translate(-3px,1px); clip-path:inset(15% 0 55% 0); }
-  #intro p.glitch::after  { opacity:.7; color:#3cf; transform:translate(3px,-1px); clip-path:inset(60% 0 10% 0); }
-  @keyframes glitch {
-    0% { transform:translate(0); } 25% { transform:translate(-2px,1px) skewX(4deg); }
-    50% { transform:translate(3px,-1px); } 75% { transform:translate(-1px,0) skewX(-3deg); } 100% { transform:translate(0); } }
-  @media (prefers-reduced-motion:reduce) { #intro p.glitch { animation:none; } #intro p.glitch::before, #intro p.glitch::after { opacity:0; } }
+  #intro::after { content:""; position:absolute; inset:0; pointer-events:none; opacity:.35;
+    background:repeating-linear-gradient(0deg, rgba(255,255,255,.05) 0 1px, transparent 1px 3px); }
+  #stack { position:relative; width:100%; max-width:34em; }
+  #logline, .ghost { font-family:"IBM Plex Mono", ui-monospace, monospace; font-style:italic;
+    font-weight:400; color:#fff; font-size:clamp(20px,3.1vw,40px); line-height:1.45; text-align:left;
+    letter-spacing:-.01em; margin:0; }
+  #logline { text-shadow:0 0 18px rgba(255,255,255,.35); animation:flick 5s infinite; }
+  #logline .w { display:inline-block; white-space:nowrap; }
+  #logline .c { opacity:0; }
+  #logline .c.on { opacity:1; }
+  #logline .c.s { opacity:.55; color:#9a9a9a; }
+  #logline b { font-weight:600; letter-spacing:.04em; }
+  .ghost { position:absolute; inset:0; pointer-events:none; opacity:0; mix-blend-mode:screen; }
+  #g1 { color:#ff2a3d; } #g2 { color:#22d3ff; }
+  @keyframes flick { 0%,92%,100% { opacity:1 } 93% { opacity:.82 } 95% { opacity:1 } 96% { opacity:.7 } 97% { opacity:1 } }
+  .by { font-size:12px; letter-spacing:.22em; text-transform:uppercase; color:var(--dim); }
+  .by a { color:var(--fg); text-decoration:none; border-bottom:1px solid var(--dim); padding-bottom:2px; }
+  .by a:hover { border-color:var(--fg); }
+  @media (prefers-reduced-motion:reduce) { #logline { animation:none; } .ghost { display:none; } }
 </style>
 </head>
 <body>
 
 <div id="intro" role="presentation">
-  <p id="logline" data-t="">LT Ellis stands a night watch where nothing is supposed to happen. His only company is his AI, OVERWATCH. Tonight they talk &mdash; and the longer they do, the harder it gets to say who is watching whom &mdash; and what exactly a human is for.</p>
+  <div id="stack">
+    <p id="logline" aria-label="LT Ellis stands a night watch where nothing is supposed to happen. His only company is his AI, OVERWATCH. Tonight they talk, and the longer they do, the harder it gets to say who is watching whom, and what exactly a human is for."></p>
+    <p class="ghost" id="g1" aria-hidden="true"></p>
+    <p class="ghost" id="g2" aria-hidden="true"></p>
+  </div>
 </div>
 
 <section id="landing">
@@ -63,6 +77,7 @@
   <div class="actions">
     <button id="enter" autofocus>Enter</button>
   </div>
+  <p class="by">Curated by <a href="https://www.linkedin.com/in/christopher-nelson01/" target="_blank" rel="noopener">Christopher Nelson</a></p>
 </section>
 
 <section id="reader" class="hidden" aria-label="The Loop">
@@ -118,23 +133,69 @@
     if (e.key === "Enter" && !$("landing").classList.contains("hidden")) enter();
   });
 
-  // Intro: black fade-in of the logline, slight glitch, then reveal the cover
+  // Intro: scramble-decode the logline, then periodic RGB-split slice glitches
   (function () {
-    var intro = $("intro"), p = $("logline"), done = false, timers = [];
-    p.setAttribute("data-t", p.textContent);
+    var intro = $("intro"), p = $("logline"), g1 = $("g1"), g2 = $("g2");
+    var TEXT = "LT Ellis stands a night watch where nothing is supposed to happen. His only company is his AI, OVERWATCH. Tonight they talk \u2014 and the longer they do, the harder it gets to say who is watching whom \u2014 and what exactly a human is for.";
+    var GLYPHS = "\u2588\u2593\u2592\u2591/\\<>#%&@01=+";
+    var done = false, chars = [], t0 = performance.now(), raf, nextBurst = 0, burstEnd = 0;
+    var rm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    TEXT.split(" ").forEach(function (word, wi, arr) {
+      var w = document.createElement("span"); w.className = "w";
+      var inner = /OVERWATCH/.test(word) ? document.createElement("b") : w;
+      if (inner !== w) w.appendChild(inner);
+      word.split("").forEach(function (ch) {
+        var c = document.createElement("span"); c.className = "c"; c.textContent = ch;
+        inner.appendChild(c);
+        chars.push({ el: c, ch: ch, at: 900 + chars.length * 26 + Math.random() * 260 });
+      });
+      p.appendChild(w);
+      if (wi < arr.length - 1) p.appendChild(document.createTextNode(" "));
+    });
+    var LAST = chars[chars.length - 1].at + 400;
+    [g1, g2].forEach(function (g) { g.textContent = TEXT; });
+
+    function rnd() { return GLYPHS.charAt(Math.floor(Math.random() * GLYPHS.length)); }
+    function slice(g, x) {
+      var top = Math.random() * 90, h = 4 + Math.random() * 18;
+      g.style.clipPath = "inset(" + top + "% 0 " + Math.max(0, 100 - top - h) + "% 0)";
+      g.style.transform = "translateX(" + x + "px)"; g.style.opacity = ".9";
+    }
+
+    function frame(now) {
+      if (done) return;
+      var t = now - t0;
+      chars.forEach(function (c) {
+        if (c.ch === " ") return;
+        var el = c.el;
+        if (t >= c.at + 280) { if (c.on !== 2) { el.textContent = c.ch; el.className = "c on"; c.on = 2; } }
+        else if (t >= c.at) { el.textContent = rnd(); el.className = "c on s"; c.on = 1; }
+      });
+      if (!rm && t > LAST) {
+        if (t > nextBurst) { burstEnd = t + 140 + Math.random() * 200; nextBurst = t + 900 + Math.random() * 1600; }
+        if (t < burstEnd) {
+          slice(g1, -6 - Math.random() * 10); slice(g2, 6 + Math.random() * 10);
+          p.style.transform = "translateX(" + (Math.random() * 6 - 3) + "px)";
+          for (var k = 0; k < 4; k++) { var r = chars[Math.floor(Math.random() * chars.length)]; if (r.ch !== " ") { r.el.textContent = rnd(); r.fix = t + 90; } }
+        } else {
+          g1.style.opacity = g2.style.opacity = 0; p.style.transform = "";
+        }
+        chars.forEach(function (c) { if (c.fix && t > c.fix) { c.el.textContent = c.ch; c.fix = 0; } });
+      }
+      if (t > LAST + 6500) return end();
+      raf = setTimeout(function () { frame(performance.now()); }, 33);
+    }
+
     function end() {
       if (done) return; done = true;
-      timers.forEach(clearTimeout); clearInterval(gl);
+      clearTimeout(raf);
       intro.classList.add("out");
-      setTimeout(function () { intro.remove(); }, 1700);
+      setTimeout(function () { intro.remove(); }, 1900);
     }
-    function pulse() { p.classList.add("glitch"); setTimeout(function () { p.classList.remove("glitch"); }, 280); }
-    var gl = setInterval(function () { if (Math.random() < .6) pulse(); }, 900);
-    timers.push(setTimeout(function () { p.classList.add("in"); }, 700));
-    timers.push(setTimeout(end, 10500));
     intro.onclick = end;
     document.addEventListener("keydown", end, { once: true });
-    if (location.hash.length > 1) end();
+    if (location.hash.length > 1) end(); else frame(performance.now());
   })();
 
   var h = parseInt(location.hash.slice(1), 10);
