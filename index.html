@@ -44,9 +44,29 @@
   #stage.zoom { align-items:flex-start; justify-content:flex-start; }
   #stage.zoom img { max-height:none; max-width:none; width:100%; }
   @media (max-width:700px) { .nav { width:25%; } }
+
+  /* Intro */
+  #intro { position:fixed; inset:0; z-index:10; background:#000; display:flex; align-items:center;
+    justify-content:center; padding:8vw; cursor:pointer; transition:opacity 1.6s ease; }
+  #intro.out { opacity:0; pointer-events:none; }
+  #intro p { max-width:34em; font-style:italic; color:#fff; font-size:clamp(17px,2.4vw,26px);
+    line-height:1.7; text-align:center; opacity:0; transition:opacity 2s ease; position:relative; }
+  #intro p.in { opacity:1; }
+  #intro p.glitch { animation:glitch .28s steps(2,end); }
+  #intro p::before, #intro p::after { content:attr(data-t); position:absolute; inset:0; opacity:0; }
+  #intro p.glitch::before { opacity:.7; color:#f33; transform:translate(-3px,1px); clip-path:inset(15% 0 55% 0); }
+  #intro p.glitch::after  { opacity:.7; color:#3cf; transform:translate(3px,-1px); clip-path:inset(60% 0 10% 0); }
+  @keyframes glitch {
+    0% { transform:translate(0); } 25% { transform:translate(-2px,1px) skewX(4deg); }
+    50% { transform:translate(3px,-1px); } 75% { transform:translate(-1px,0) skewX(-3deg); } 100% { transform:translate(0); } }
+  @media (prefers-reduced-motion:reduce) { #intro p.glitch { animation:none; } #intro p.glitch::before, #intro p.glitch::after { opacity:0; } }
 </style>
 </head>
 <body>
+
+<div id="intro" role="presentation">
+  <p id="logline" data-t="">LT Ellis stands a night watch where nothing is supposed to happen. His only company is his AI, OVERWATCH. Tonight they talk &mdash; and the longer they do, the harder it gets to say who is watching whom &mdash; and what exactly a human is for.</p>
+</div>
 
 <section id="landing">
   <img src="cover.webp" alt="The Loop — cover: an officer at a control desk faces a giant smiley face on a screen">
@@ -107,6 +127,7 @@
   $("zoom").onclick = function () { $("stage").classList.toggle("zoom"); };
 
   document.addEventListener("keydown", function (e) {
+    if ($("intro")) return;
     if ($("reader").classList.contains("hidden")) {
       if (e.key === "Enter" || e.key === "ArrowRight") show(2);
       return;
@@ -123,6 +144,25 @@
     var dx = e.changedTouches[0].clientX - touchX; touchX = null;
     if (Math.abs(dx) > 50) dx < 0 ? show(page + 1) : (page === 2 ? cover() : show(page - 1));
   }, { passive: true });
+
+  // Intro: black fade-in of the logline, slight glitch, then reveal the cover
+  (function () {
+    var intro = $("intro"), p = $("logline"), done = false, timers = [];
+    p.setAttribute("data-t", p.textContent);
+    function end() {
+      if (done) return; done = true;
+      timers.forEach(clearTimeout); clearInterval(gl);
+      intro.classList.add("out");
+      setTimeout(function () { intro.remove(); }, 1700);
+    }
+    function pulse() { p.classList.add("glitch"); setTimeout(function () { p.classList.remove("glitch"); }, 280); }
+    var gl = setInterval(function () { if (Math.random() < .6) pulse(); }, 900);
+    timers.push(setTimeout(function () { p.classList.add("in"); }, 700));
+    timers.push(setTimeout(end, 10500));
+    intro.onclick = end;
+    document.addEventListener("keydown", end, { once: true });
+    if (location.hash.length > 1) end();
+  })();
 
   var h = parseInt(location.hash.slice(1), 10);
   if (h >= 2 && h <= TOTAL) show(h, false);
